@@ -9,47 +9,64 @@ Original file is located at
 #load data
 """
 
-from google.colab import drive
-drive.mount('/content/drive')
-
+# from google.colab import drive
+# drive.mount('/content/drive')
+import streamlit as st
+import numpy as np
 import joblib
 import pandas as pd
+import plotly.graph_objects as go
 
 # Ganti path sesuai lokasi file kamu di Drive
-model = joblib.load('/content/drive/My Drive/Colab Notebooks/Example Dataset/Pima indians diabetes dataset/xgb_diabetes_model.pkl')
-scaler = joblib.load('/content/drive/My Drive/Colab Notebooks/Example Dataset/Pima indians diabetes dataset/scaler.pkl')
+model = joblib.load("xgb_diabetes_model.pkl")
+scaler = joblib.load("scaler.pkl")
 
-"""#Input Data"""
+st.set_page_config(page_title="Prediksi Diabetes", page_icon="🩺")
+st.title("🩺 Prediksi Diabetes")
+st.write("Masukkan data kesehatan Anda sesuai petunjuk di bawah ini 👇")
 
-# Data baru (misalnya dari input user)
-input_data = pd.DataFrame([{
-    'Pregnancies': 2,
-    'Glucose': 120,
-    'BloodPressure': 70,
-    'SkinThickness': 25,
-    'Insulin': 80,
-    'BMI': 28.5,
-    'DiabetesPedigreeFunction': 0.5,
-    'Age': 32
-}])
-
-"""#Preprocess Data"""
-
-numeric_columns = ['Pregnancies', 'Glucose', 'BloodPressure', 'SkinThickness',
-                   'Insulin', 'BMI', 'DiabetesPedigreeFunction', 'Age']
-scaled_columns = [col + 'Scaled' for col in numeric_columns]
-
-# Transform pakai scaler
-input_scaled_array = scaler.transform(input_data[numeric_columns])
-input_scaled = pd.DataFrame(input_scaled_array, columns=scaled_columns)
-
-"""#Output"""
+# Input sliders
+pregnancies = st.slider("🤰 Jumlah Kehamilan", 0, 15, 0, help="Biasanya 0–15 kali dalam dataset")
+glucose = st.slider("🍬 Glukosa (mg/dL)", 50, 200, 100, help="Normal: 70–140 mg/dL")
+blood_pressure = st.slider("🫀 Tekanan Darah (mmHg)", 40, 140, 80, help="Normal: 80–120 mmHg")
+skin_thickness = st.slider("📏 Ketebalan Lipatan Kulit (mm)", 0, 100, 20, help="Biasanya 10–50 mm")
+insulin = st.slider("💉 Insulin (mu U/ml)", 0, 900, 80, help="Normal: 16–166 mu U/ml")
+bmi = st.slider("⚖️ BMI", 10.0, 60.0, 25.0, 0.1, help="Normal: 18.5–24.9")
+dpf = st.slider("📊 Diabetes Pedigree Function", 0.0, 2.5, 0.5, 0.01, help="Semakin tinggi, semakin besar kemungkinan memiliki riwayat keluarga diabetes")
+age = st.slider("🎂 Usia", 10, 100, 30, help="Umumnya 21–80 tahun pada dataset")
 
 # Prediksi
-pred = model.predict(input_scaled)[0]
-proba = model.predict_proba(input_scaled)[0][1]
-
-# Tampilkan hasil
-hasil = "Diabetes" if pred == 1 else "Tidak Diabetes"
-print(f"Prediksi: {hasil}")
-print(f"Probabilitas Diabetes: {proba * 100:.2f}%")
+if st.button("🔍 Prediksi"):
+    # Masukkan data ke array
+    input_data = np.array([[pregnancies, glucose, blood_pressure, skin_thickness, insulin, bmi, dpf, age]])
+    
+    # Scaling
+    input_scaled = scaler.transform(input_data)
+    
+    # Prediksi
+    prediction = model.predict(input_scaled)
+    prob = model.predict_proba(input_scaled)[0][1]  # Probabilitas diabetes
+    
+    # Speedometer Chart
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = prob * 100,
+        title = {'text': "Probabilitas Diabetes (%)"},
+        gauge = {
+            'axis': {'range': [0, 100]},
+            'bar': {'color': "darkblue"},
+            'steps': [
+                {'range': [0, 40], 'color': "lightgreen"},
+                {'range': [40, 70], 'color': "yellow"},
+                {'range': [70, 100], 'color': "red"}
+            ],
+        }
+    ))
+    
+    st.plotly_chart(fig)
+    
+    # Teks hasil
+    if prediction[0] == 1:
+        st.error(f"⚠️ Hasil: Kemungkinan **TERDIAGNOSA** diabetes ({prob*100:.2f}%)")
+    else:
+        st.success(f"✅ Hasil: Kemungkinan **TIDAK TERDIAGNOSA** diabetes ({(1-prob)*100:.2f}%)")
